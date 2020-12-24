@@ -1,4 +1,4 @@
-use cc::Build;
+﻿use cc::Build;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -27,7 +27,7 @@ fn main() {
             .flag_if_supported("/std:c++17");
         build.include("webview-official/script");
 
-        for &lib in &["windowsapp", "user32", "oleaut32", "ole32"] {
+        for &lib in &["user32", "oleaut32", "ole32"] {
             println!("cargo:rustc-link-lib={}", lib);
         }
 
