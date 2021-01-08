@@ -1,7 +1,22 @@
 ﻿use cc::Build;
 use std::env;
-use std::fs;
-use std::path::PathBuf;
+use std::fs::{self, DirEntry};
+use std::path::{Path, PathBuf};
+
+fn visit_dirs<P: AsRef<Path>>(dir: P, cb: &mut dyn FnMut(&DirEntry)) -> std::io::Result<()> {
+    if dir.as_ref().is_dir() {
+        for entry in fs::read_dir(dir.as_ref())? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit_dirs(&path, cb)?;
+            } else {
+                cb(&entry);
+            }
+        }
+    }
+    Ok(())
+}
 
 fn main() {
     let mut build = Build::new();
@@ -26,6 +41,26 @@ fn main() {
             .file("webview-official/webview.cc")
             .flag_if_supported("/std:c++17");
         build.include("webview-official/script");
+
+	let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+	let mut lib_path = PathBuf::from(&dir).join("webview-official/cef/lib");
+	if cfg!(target_arch = "x86_64") {
+            lib_path.push("x64")
+	}
+	println!("cargo:rustc-link-search=native={}", lib_path.display());
+	println!("cargo:rustc-link-lib=libcef");
+	build.define("USING_CEF_SHARED", None);
+	build.define("NOMINMAX", None); // resovle std::max error
+        build.include("webview-official/cef");
+
+	visit_dirs("webview-official/cef/libcef_dll", &mut |de: &DirEntry|{
+	    let p = de.path();
+	    if let Some(ext) = p.extension(){
+		if ext == "cc"{
+		    build.file(p);
+		}
+	    }
+	}).unwrap();
 
         for &lib in &["user32", "oleaut32", "ole32"] {
             println!("cargo:rustc-link-lib={}", lib);
